@@ -2,47 +2,63 @@
 
 ## What the tool checks
 
-The Manufacturing Requirements Traceability Checker reviews a local CSV of functional requirements for a discrete-manufacturing scenario. The examples here use a bicycle suspension assembly as illustrative context. The checker looks for missing universally required data, duplicate requirement IDs, invalid workflow statuses, and approved requirements missing an acceptance check or test case ID.
+The Manufacturing Requirements Traceability Checker validates requirement and test-case CSV files, checks requirement-to-test and test-to-requirement links, and writes an issue report and coverage matrix. It flags unknown test IDs, requirements without test coverage, unknown requirement IDs, tests not referenced by their linked requirements, and other content or schema/input issues.
 
-It is a CSV-based tool and does not establish a live SAP connection.
+## Prepare the inputs
 
-## Prepare the input
-
-Create a CSV with this required header:
+Create `data/requirements.csv` with one requirement per row and this exact header:
 
 ```csv
-requirement_id,process_step,requirement,owner,acceptance_check,test_case_id,status
+requirement_id,scope_area,requirement_type,process_step,requirement,owner,acceptance_check,integration_point,test_case_id,status
 ```
 
-Use one row per requirement. Every row must have nonempty values for `requirement_id`, `process_step`, `requirement`, `owner`, and `status`. Requirement IDs must be unique in the file. Status values are `DRAFT`, `IN_REVIEW`, or `APPROVED`; status matching is case-insensitive. For an approved row, provide both `acceptance_check` and `test_case_id`.
+Every requirement row must have nonempty `requirement_id`, `scope_area`, `requirement_type`, `process_step`, `requirement`, `owner`, and `status`, plus at least one linked test-case ID. If there are multiple tests, separate their IDs with semicolons in `test_case_id`. Requirement IDs must be unique. Allowed scope areas are `PP`, `PEO`, `PLM`, and `PLMSI`. Allowed requirement types are `BUSINESS_SCENARIO`, `FUNCTIONAL_REQUIREMENT`, `USER_STORY`, `DESIGN_DOCUMENT`, `DATA_MAPPING`, `INTEGRATION_MAPPING`, `TEST_PLAN`, and `USER_MANUAL`. Status values are `DRAFT`, `IN_REVIEW`, or `APPROVED`; input matching is case-insensitive. An `APPROVED` row needs an `acceptance_check`, and an `INTEGRATION_MAPPING` row needs an `integration_point`.
 
-For example, a bicycle suspension assembly record might describe a fork assembly inspection step. Use process-specific, reviewed requirement statements and checks for actual work; the context and sample wording in these documents are illustrative only.
+Create `data/test_cases.csv` with one test per row and this exact header:
+
+```csv
+test_case_id,requirement_id,expected_result
+```
+
+Test IDs must be unique. Each test names the requirement it covers. For traceability to agree, each requirement's test IDs must exist in the test CSV and each test's `requirement_id` must match a requirement that references that test.
 
 ## Run the checker
 
-From the project directory, run the required command:
+From the project directory, run:
 
 ```bash
-python3 -m traceability_checker --input data/requirements.csv --report output/traceability_report.csv
+python3 -m traceability_checker --input data/requirements.csv --test-cases data/test_cases.csv --report output/traceability_report.csv --matrix output/coverage_matrix.csv
 ```
 
-The paths shown are relative to the current working directory. Ensure the input path points to the CSV you intend to review. The command requests a CSV report at `output/traceability_report.csv`.
+For the gap sample, substitute `data/requirements_with_gaps.csv` and `data/test_cases_with_gaps.csv` for the corresponding input paths. The command writes both the issue report and coverage matrix to the specified destinations.
 
-## Interpret the result
+## Interpret the outputs
+
+The issue report `output/traceability_report.csv` has these columns:
+
+```csv
+source_file,record,severity,code,requirement_id,test_case_id,field,value,message
+```
+
+The coverage matrix `output/coverage_matrix.csv` has these columns:
+
+```csv
+requirement_id,scope_area,requirement_type,process_step,requirement,status,test_case_id,test_case_expected_result,coverage_status
+```
+
+The issue report describes detected issues. The matrix combines requirement and test details with status and coverage status.
 
 Use the process exit status to distinguish outcomes:
 
 | Exit code | Interpretation | Next step |
 | --- | --- | --- |
-| `0` | The file is clean under the defined validation rules. | Continue with the applicable business process and cross-functional review. |
-| `1` | The CSV schema is valid, but one or more rows have invalid content. | Review the report, correct the affected requirement records, and rerun the command. |
-| `2` | The CSV schema is invalid. | Correct the header so it contains the required columns with the exact names, then rerun. |
-
-The report CSV has the columns `record`, `severity`, `code`, `requirement_id`, `field`, `value`, and `message`. A clean file receives an informational summary row; a file with gaps receives one or more error rows.
+| `0` | No content gaps. | Review the generated matrix as needed. |
+| `1` | One or more content gaps. | Use the issue report to correct the input records and rerun. |
+| `2` | Schema or input error. | Check both CSV headers, input paths, and file readability, then rerun. |
 
 ## Related local tests
 
-Run the project's automated tests with:
+Run the automated tests with:
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -50,10 +66,9 @@ python3 -m unittest discover -s tests -v
 
 ## Troubleshooting checklist
 
-- **Schema exit code (`2`):** Check for all seven required columns and preserve their exact spelling and capitalization.
-- **Content exit code (`1`):** Check required cells for blanks or whitespace-only values; check for repeated IDs and unsupported statuses.
-- **Approved row flagged:** Confirm both `acceptance_check` and `test_case_id` contain values.
-- **Status flagged:** Use only `DRAFT`, `IN_REVIEW`, or `APPROVED`. Input letter case does not matter.
-- **Report path:** Check that the output folder is writable. The checker creates the report's parent folders if needed.
-
-The tool supports documentation and review of requirement/user-story capture and related design/test documents and test plans. It does not substitute for process analysis, cross-functional collaboration, or troubleshooting judgment.
+- **Exit code `2`:** Confirm both files are readable and use the exact headers shown above, including spelling, capitalization, and column names.
+- **Exit code `1`:** Check required cells, allowed scope areas and requirement types, unique IDs, and conditional `acceptance_check` / `integration_point` requirements.
+- **Unknown test ID:** Confirm every semicolon-separated ID in a requirement's `test_case_id` cell exists in `data/test_cases.csv`.
+- **Unknown requirement ID:** Confirm every test's `requirement_id` exists in `data/requirements.csv`.
+- **Traceability mismatch or missing coverage:** Ensure each requirement references its test and each test points back to the same requirement; every requirement needs at least one test.
+- **Output path:** Confirm the report and matrix parent folders are writable.

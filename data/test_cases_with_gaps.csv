@@ -1,0 +1,4 @@
+test_case_id,requirement_id,expected_result
+TC-002,REQ-101,The assembly revision is recorded
+TC-104,REQ-103,The test result is compared with the user story
+TC-999,REQ-404,The result is recorded for a missing requirement

@@ -1,26 +1,24 @@
 # Manufacturing Requirements Traceability Checker
 
-A Python CLI that reviews a functional-requirements CSV and flags gaps that make a requirement difficult to review or test. It checks whether each requirement has a process step, description, owner, and valid status, and whether approved requirements include an acceptance check and linked test case ID.
+A Python CLI that checks a manufacturing requirements log against a separate test-case catalog in both directions. It verifies that requirements name existing tests, each test links back to the same requirement, and every requirement has coverage. It writes an issue report and a requirement-to-test coverage matrix.
 
-The sample context is a discrete-manufacturing process for a bicycle suspension assembly. The project turns a requirement log into a reviewable gap report—supporting requirement capture, test planning, and troubleshooting.
+The sample data uses a bicycle suspension assembly and stays within the job description's named areas: PP, PEO, PLM, and PLMSI. Requirement types use related work products such as business scenarios, functional requirements, user stories, design documents, data/integration mapping, test plans, and user manuals.
 
 ## Run locally
 
-**Requirements:** Python 3.10 or newer. The tool uses only the Python standard library; no setup or external service is required.
+**Requirements:** Python 3.10 or newer. The project uses only the Python standard library; no installation, credentials, or external service is required.
 
-From the project directory, run the complete example:
-
-```bash
-python3 -m traceability_checker --input data/requirements.csv --report output/traceability_report.csv
-```
-
-Then check the file containing deliberate gaps:
+From the project directory, run the clean example:
 
 ```bash
-python3 -m traceability_checker --input data/requirements_with_gaps.csv --report output/gaps_report.csv
+python3 -m traceability_checker --input data/requirements.csv --test-cases data/test_cases.csv --report output/traceability_report.csv --matrix output/coverage_matrix.csv
 ```
 
-The clean file exits with status `0`; the gap example reports the missing owner, acceptance check, test case, duplicate ID, and invalid status, then exits with status `1`. An unreadable CSV or missing required column exits with status `2`. The report is CSV and the input is not changed.
+Run the deliberately inconsistent examples:
+
+```bash
+python3 -m traceability_checker --input data/requirements_with_gaps.csv --test-cases data/test_cases_with_gaps.csv --report output/gaps_report.csv --matrix output/gaps_coverage_matrix.csv
+```
 
 Run the automated tests:
 
@@ -28,30 +26,58 @@ Run the automated tests:
 python3 -m unittest discover -s tests -v
 ```
 
-The current suite has 8 automated tests and passes locally.
+The clean example exits `0`; the gap example exits `1`; schema or file-input errors exit `2`. Reports and matrices are generated locally under `output/`, which is ignored by Git. The current suite has 16 passing tests.
 
-## Input format
+## What is checked
 
-One row represents one functional requirement or user story. Required headers:
+- Required requirement fields, approved-requirement acceptance checks, unique requirement IDs, and valid status values.
+- Scope area limited to `PP`, `PEO`, `PLM`, or `PLMSI`; requirement type limited to the documented set.
+- **Requirement → test:** each semicolon-separated test ID in a requirement row must exist in the test-case file and link back to that same requirement.
+- **Test → requirement:** each test must reference an existing requirement, and that requirement must list the test.
+- Every requirement must have at least one linked test; integration-mapping requirements need an integration point.
 
-```text
-requirement_id,process_step,requirement,owner,acceptance_check,test_case_id,status
+The sample gap input demonstrates unknown test IDs, an uncovered requirement, a duplicate requirement ID, a test not listed by its linked requirement, and a test pointing to an unknown requirement.
+
+## Example coverage matrix
+
+```csv
+requirement_id,scope_area,requirement_type,process_step,requirement,status,test_case_id,test_case_expected_result,coverage_status
+REQ-001,PP,BUSINESS_SCENARIO,Capture production request,The request includes the assembly quantity and required date,APPROVED,TC-001,The request has an assembly identifier quantity and required date,COVERED
+REQ-002,PLM,INTEGRATION_MAPPING,Confirm product structure,The assembly revision is identified for planning review,APPROVED,TC-002,The approved assembly structure and revision can be identified,COVERED
+REQ-002,PLM,INTEGRATION_MAPPING,Confirm product structure,The assembly revision is identified for planning review,APPROVED,TC-003,The planner can match the request to the identified structure,COVERED
+REQ-102,PP,FUNCTIONAL_REQUIREMENT,Review component data,Component quantities are present,DRAFT,,,NO_TEST_CASE
 ```
 
-Allowed status values are `DRAFT`, `IN_REVIEW`, and `APPROVED` (case-insensitive). Every row needs an ID, process step, requirement, owner, and status. Approved requirements also need an acceptance check and a test case ID.
+A gap-report excerpt from the sample run:
 
-## What it catches
+```csv
+source_file,record,severity,code,requirement_id,test_case_id,field,value,message
+requirements.csv,2,ERROR,E_UNKNOWN_TEST_CASE,REQ-101,TC-404,test_case_id,TC-404,This linked test case ID does not exist in the test-case file.
+test_cases.csv,3,ERROR,E_TEST_NOT_REFERENCED_BY_REQUIREMENT,REQ-103,TC-104,test_case_id,TC-104,"This test case points to the requirement, but the requirement does not list the test case."
+```
 
-The checker identifies blank required information, duplicate requirement IDs, statuses outside the allowed list, and approved requirements without an acceptance check or test case ID. It reports the source record and field so the requirement owner can resolve the gap.
+## Input formats
+
+Requirements use one row per requirement, with columns:
+
+```text
+requirement_id,scope_area,requirement_type,process_step,requirement,owner,acceptance_check,integration_point,test_case_id,status
+```
+
+A requirement may list multiple test IDs in `test_case_id`, separated by semicolons. Test cases use one row per test:
+
+```text
+test_case_id,requirement_id,expected_result
+```
 
 ## Project contents
 
-- `traceability_checker/` — CSV checks, report generation, and CLI.
-- `data/` — one complete requirements log and one with deliberate gaps.
-- `tests/` — automated tests for clean input, gaps, schema errors, and report output.
-- [Workflow](docs/workflow.md) — how requirements move from capture through review and test planning.
-- [Data dictionary](docs/data_dictionary.md) — field meanings and validation rules.
-- [Test plan](docs/test_plan.md) — validation scenarios and expected outcomes.
-- [User guide](docs/user_guide.md) — exact commands, statuses, and report interpretation.
+- `traceability_checker/` — CSV validation, two-way link checks, report and matrix generation, CLI.
+- `data/` — clean and deliberately inconsistent requirements/test-case examples.
+- `tests/` — automated tests for cross-links, missing/unknown records, controlled values, and outputs.
+- [Workflow](docs/workflow.md) — review steps and bidirectional validation rules.
+- [Data dictionary](docs/data_dictionary.md) — fields and their meanings.
+- [Test plan](docs/test_plan.md) — scenarios and expected results.
+- [User guide](docs/user_guide.md) — commands and report interpretation.
 
-This standalone project does not connect to SAP. It is designed around requirement capture, process documentation, test planning, and user guidance in a manufacturing scenario.
+This standalone CSV utility does not connect to SAP or replace process and cross-functional review. It is a concrete artifact for requirements, test planning, documentation, integration mapping, and troubleshooting work named in the job description.

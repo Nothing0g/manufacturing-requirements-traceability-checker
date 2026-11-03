@@ -1,0 +1,6 @@
+test_case_id,requirement_id,expected_result
+TC-001,REQ-001,The request has an assembly identifier quantity and required date
+TC-002,REQ-002,The approved assembly structure and revision can be identified
+TC-003,REQ-002,The planner can match the request to the identified structure
+TC-004,REQ-003,Every component line includes an ID quantity and unit
+TC-005,REQ-004,A missing-information issue has a named owner

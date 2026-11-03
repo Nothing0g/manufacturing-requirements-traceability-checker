@@ -2,46 +2,47 @@
 
 ## Objective
 
-Verify that the Manufacturing Requirements Traceability Checker accepts a clean requirements CSV and identifies the defined schema and content issues. The current automated suite contains eight tests and passes locally. This test plan also describes manual scenarios for additional review.
+Verify that the Manufacturing Requirements Traceability Checker validates the requirement and test-case CSV schemas, checks traceability in both directions, and writes an issue report and coverage matrix. Include clean inputs, content gaps, and schema/input errors.
 
 ## Test setup
 
 - Work from the project directory.
-- Prepare CSV fixtures using the required header: `requirement_id,process_step,requirement,owner,acceptance_check,test_case_id,status`.
-- Use bicycle suspension assembly wording only as illustrative fixture content. Do not treat sample process language as approved engineering criteria.
-- Run the project test suite with:
+- Prepare `data/requirements.csv` with header `requirement_id,scope_area,requirement_type,process_step,requirement,owner,acceptance_check,integration_point,test_case_id,status` and one requirement per row.
+- Prepare `data/test_cases.csv` with header `test_case_id,requirement_id,expected_result` and one test per row. Test IDs must be unique.
+- Requirement `test_case_id` values contain one or more test IDs separated by semicolons.
+- Run the automated suite:
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-- Exercise the CLI using the documented command:
+- Run the checker against the standard inputs:
 
 ```bash
-python3 -m traceability_checker --input data/requirements.csv --report output/traceability_report.csv
+python3 -m traceability_checker --input data/requirements.csv --test-cases data/test_cases.csv --report output/traceability_report.csv --matrix output/coverage_matrix.csv
 ```
 
-For each scenario, inspect the process exit code and the generated report. The report columns are `record`, `severity`, `code`, `requirement_id`, `field`, `value`, and `message`. A clean result contains an informational row; content gaps produce one or more error rows.
+For the gap sample, substitute `data/requirements_with_gaps.csv` and `data/test_cases_with_gaps.csv` for the two input paths while retaining the report and matrix destinations. Inspect the exit code and both generated CSVs. The issue report columns are `source_file,record,severity,code,requirement_id,test_case_id,field,value,message`. The coverage matrix columns are `requirement_id,scope_area,requirement_type,process_step,requirement,status,test_case_id,test_case_expected_result,coverage_status`.
 
 ## Acceptance scenarios
 
 | ID | Scenario | Expected outcome |
 | --- | --- | --- |
-| TP-01 | A structurally valid CSV has unique nonempty requirement IDs, all required fields populated, valid statuses, and both traceability fields populated for approved rows. | Exit code `0`; file is treated as clean. |
-| TP-02 | A row has a blank or whitespace-only `requirement_id`. | Content issue; exit code `1`. |
-| TP-03 | A row has a blank or whitespace-only `process_step`, `requirement`, `owner`, or `status`, tested individually. | Content issue for each affected record; exit code `1`. |
-| TP-04 | Two or more rows use a duplicate `requirement_id`. | Duplicate-ID content issue; exit code `1`. |
-| TP-05 | A row uses an unsupported status value. | Invalid-status content issue; exit code `1`. |
-| TP-06 | A row uses each valid status in lowercase or mixed case. | Status is accepted case-insensitively; no status issue for that value. Overall exit depends on any other issues. |
-| TP-07 | An approved row has an empty `acceptance_check` while its `test_case_id` is populated. | Missing acceptance-check content issue; exit code `1`. |
-| TP-08 | An approved row has a populated `acceptance_check` and an empty `test_case_id`. | Missing test-case-ID content issue; exit code `1`. |
-| TP-09 | An approved row has both `acceptance_check` and `test_case_id` empty. | Both requirements are flagged as applicable content issues; exit code `1`. |
-| TP-10 | A non-approved row has an empty `acceptance_check` and/or `test_case_id`, while its universally required fields are populated. | No approved-row traceability issue; overall exit depends on any other issues. |
-| TP-11 | The CSV omits one or more required header columns. | Invalid schema; exit code `2`. |
-| TP-12 | A required header name is misspelled or has different capitalization. | Invalid schema; exit code `2`. |
-| TP-13 | A valid schema contains one or more content problems. | Exit code `1` rather than `2`, because the schema is valid. |
-| TP-14 | A valid, clean file is checked using the specified input and report arguments. | Exit code `0`; the report is created with an informational summary row. |
+| TP-01 | Both inputs have the exact headers; requirement and test IDs are unique; required values and conditional values are valid; all links agree in both directions. | Exit code `0`; report and coverage matrix are written. |
+| TP-02 | A required requirement field is blank or whitespace-only, including any of `requirement_id`, `scope_area`, `requirement_type`, `process_step`, `requirement`, `owner`, or `status`. | Content gap; exit code `1`. |
+| TP-03 | A requirement uses a scope area other than `PP`, `PEO`, `PLM`, or `PLMSI`. | Content gap; exit code `1`. |
+| TP-04 | A requirement uses a type other than `BUSINESS_SCENARIO`, `FUNCTIONAL_REQUIREMENT`, `USER_STORY`, `DESIGN_DOCUMENT`, `DATA_MAPPING`, `INTEGRATION_MAPPING`, `TEST_PLAN`, or `USER_MANUAL`. | Content gap; exit code `1`. |
+| TP-05 | Requirement IDs are duplicated, or test-case IDs are duplicated in their respective input. | Content gap; exit code `1`. |
+| TP-06 | An `APPROVED` requirement has no `acceptance_check`. | Content gap; exit code `1`. |
+| TP-07 | An `INTEGRATION_MAPPING` requirement has no `integration_point`. | Content gap; exit code `1`. |
+| TP-08 | A requirement has no test-case link. | Requirement has no test coverage; exit code `1`. |
+| TP-09 | A requirement references an unknown test ID. | Unknown test ID is flagged; exit code `1`. |
+| TP-10 | A linked test points to a different requirement than the requirement row that references it. | Bidirectional link mismatch is flagged; exit code `1`. |
+| TP-11 | A test references an unknown requirement ID. | Unknown requirement ID is flagged; exit code `1`. |
+| TP-12 | A test's linked requirement exists but does not reference that test. | Test not referenced by its linked requirement is flagged; exit code `1`. |
+| TP-13 | Either CSV omits a required header or uses incorrect header names/capitalization. | Schema/input error; exit code `2`. |
+| TP-14 | Valid schemas contain one or more content gaps. | Exit code `1`, not `2`; outputs identify the issues and coverage. |
 
 ## Completion criteria
 
-Completion is checked by the eight passing automated tests and manual review of clean and gap-containing CSV examples. The CLI contract is `0` for clean content, `1` for invalid content with a valid schema, and `2` for an invalid schema. Operating-system or file-access errors are printed as input errors.
+Run the automated suite with `python3 -m unittest discover -s tests -v` and review both standard and gap-sample CLI outputs. The CLI contract is `0` for clean content, `1` for content gaps, and `2` for schema or input errors. Confirm that the issue report and coverage matrix use their documented columns.
