@@ -1,0 +1,4 @@
+requirement_id,process_step,requirement,owner,acceptance_check,test_case_id,status
+REQ-101,Capture production request,The request includes an assembly quantity and date,,,,APPROVED
+REQ-101,Confirm product structure,The assembly revision is recorded,Product data owner,The revision is visible,TC-002,APPROVED
+REQ-102,Review component data,Component quantities are present,Functional team member,,TC-003,READY

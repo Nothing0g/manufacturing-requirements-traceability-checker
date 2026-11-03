@@ -1,0 +1,5 @@
+requirement_id,process_step,requirement,owner,acceptance_check,test_case_id,status
+REQ-001,Capture production request,The request includes the assembly quantity and required date,Production planner,The request row contains an assembly ID quantity and required date,TC-001,APPROVED
+REQ-002,Confirm product structure,The assembly revision is identified for planning review,Product data owner,The assembly revision and its review status are recorded,TC-002,APPROVED
+REQ-003,Review component information,The component list includes an ID quantity and unit for each line,Product data owner,Each component row has a component ID positive quantity and unit,TC-003,IN_REVIEW
+REQ-004,Resolve open questions,The person reviewing the request records who will resolve missing information,Functional team member,Every recorded gap has a named owner,TC-004,DRAFT
