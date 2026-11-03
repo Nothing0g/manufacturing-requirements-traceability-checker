@@ -2,7 +2,7 @@
 
 ## Objective
 
-Verify that the Manufacturing Requirements Traceability Checker accepts a clean requirements CSV and identifies the defined schema and content issues. The current automated suite contains seven tests and passes locally. This test plan also describes manual scenarios for additional review.
+Verify that the Manufacturing Requirements Traceability Checker accepts a clean requirements CSV and identifies the defined schema and content issues. The current automated suite contains eight tests and passes locally. This test plan also describes manual scenarios for additional review.
 
 ## Test setup
 
